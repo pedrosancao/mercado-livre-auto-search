@@ -13,6 +13,7 @@
     #app {
         max-width: 1550px;
         margin: auto;
+        padding: 0 15px;
     }
     p:last-child {
         margin-bottom: 0;
@@ -64,13 +65,13 @@
         <div class="terms mt-2">
             <p
                 v-if="!watchlistError && terms.length === 0"
-                class="bg-light border text-center p-1 rounded"
+                class="bg-light border rounded text-center p-1"
                 @click="watchlist"
             >Load watch list</p>
             <template v-for="term, index in terms">
                 <p
                     v-if="_.filter(products, { term }).length === 0"
-                    class="bg-light border text-center p-1 rounded"
+                    class="bg-light border rounded text-center p-1"
                     @click="load(index)"
                 >
                     {{ term | ucWords }}
@@ -79,7 +80,7 @@
                     </button>
                 </p>
             </template>
-            <input type="text" class="w-100" v-model="newTerm" @keypress="addTerm">
+            <input type="text" class="w-100 bg-light border rounded text-center py-1" v-model="newTerm" @keypress="addTerm">
         </div>
         <template v-for="group in products">
             <h3 class="mt-3 px-5">{{ group.term | ucWords }}</h3>
