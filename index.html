@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Jogos Nintendo Switch ML</title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.4.0/css/bootstrap.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.13.0/css/all.min.css">
+    <style>
+    body {
+        text-align: center;
+    }
+    #app {
+        max-width: 1550px;
+        margin: auto;
+    }
+    p:last-child {
+        margin-bottom: 0;
+    }
+    .products {
+        display: grid;
+        grid-template-columns: repeat(1, 1fr);
+        grid-gap: 15px;
+    }
+    @media (min-width: 300px) {
+        .products {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+    @media (min-width: 650px) {
+        .products {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+    @media (min-width: 800px) {
+        .products {
+            grid-template-columns: repeat(4, 1fr);
+        }
+    }
+    @media (min-width: 1200px) {
+        .products {
+            grid-template-columns: repeat(6, 1fr);
+        }
+    }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <div class="messages mt-2" v-if="messages.length > 0">
+            <div class="alert alert-warning" v-for="message in messages">{{ message }}</div>
+        </div>
+        <template v-for="group in products">
+            <h3 class="mt-3 px-5">{{ group.term | ucWords }}</h3>
+            <div class="products mt-2">
+                <template v-if="group.results.length === 0">
+                    <div class="p-2 bg-light border text-center d-flex flex-column justify-content-between">
+                        <p>Nenhum resultado</p>
+                    </div>
+                </template>
+                <template v-for="product in _.sortBy(group.results, 'price')">
+                    <div v-if="product" class="p-2 bg-light border text-center d-flex flex-column justify-content-between">
+                        <p><a :href="product.permalink" target="_blank">{{ product.title }}</a></p>
+                        <a :href="product.permalink" target="_blank"><img :src="product.thumbnail" class="m-auto"></a>
+                        <p>{{ product.price.toLocaleString('defaut', { style: 'currency', currency: 'BRL' }) }}</p>
+                        <p v-if="product.seller.details">
+                            <a :href="product.seller.details.permalink" :title="product.seller.details.nickname" target="_blank">
+                                <i class="fas fa-square" :style="`color: ${getReputationColor(product.seller.details.seller_reputation.level_id)};`"></i>
+                            </a>
+                            <small>{{ _.values(product.seller.details.seller_reputation.transactions.ratings).map(value => _.round(value * 100) + '%').join(' / ') }}</small>
+                            -
+                            <small>{{ product.seller.details.seller_reputation.transactions.canceled }}/{{ product.seller.details.seller_reputation.transactions.completed }}</small>
+                        </p>
+                    </div>
+                </template>
+            </div>
+        </template>
+    </div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.15/lodash.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.11/vue.js"></script>
+    <script>
+        function search(search) {
+            let url = 'https://api.mercadolibre.com/sites/MLB/search?'
+            let query = $.param({
+                category: 'MLB186456'
+            ,   q: search
+            ,   price: '160.0-260.0'
+            ,   sort: 'price_asc'
+            // ,   shipping_quarantine: 'guaranteed_delivery'
+            ,   ITEM_CONDITION: 2230581
+            ,   VIDEO_GAME_PLATFORM:424952
+            })
+            return fetch(url + query);
+        }
+        async function seller (id) {
+            let resp = await fetch('https://api.mercadolibre.com/users/' + id)
+            return await resp.json()
+        }
+        let raw = {}
+        let games = [
+            'mario odyssey'
+        ,   'super smash bros ultimate'
+        ,   'super mario party switch'
+        ,   'zelda breath of the wild'
+        ,   'donkey kong tropical freeze'
+        ,   'pokemon sword'
+        ,   'pokemon shield'
+        ,   'mario kart 8 deluxe'
+        // ,   'xenoblade 2'
+        ,   'splatoon 2'
+        // ,   'steamworld dig 2'
+        ]
+        let app = new Vue({
+            el: '#app',
+            data: {
+                messages: [],
+                products: []
+            },
+            filters: {
+                ucWords: function (value) {
+                    return value.replace(/\b\w/g, match => match.toUpperCase())
+                }
+            },
+            methods: {
+                getReputationColor: function (value) {
+                    let key = (value || '0').split('_')[0]
+                    return _.get(['lightgray', 'red', 'orange', 'gold', 'lightgreen', 'green'], key)
+                }
+            },
+            created: function () {
+                games.reduce((promise, game) => {
+                    return promise.then(() => {
+                        return search(game).then(resp => {
+                            return resp.json().then(data => {
+                                data.paging.total > 50 && this.messages.push(game + ' tem mais de 50 resultados')
+                                raw[game] = data
+                                this.products.push({
+                                    term: game,
+                                    results: _.reject(data.results, product => {
+                                        let title = product.title.toLocaleLowerCase()
+                                        return title.indexOf('3ds') > -1 ||
+                                            title.indexOf('wii') > -1 ||
+                                            title.indexOf('fones') > -1 ||
+                                            title.indexOf('digitais') > -1 ||
+                                            title.indexOf('digital') > -1 ||
+                                            title.indexOf('amiibo') > -1 ||
+                                            _.filter(product.attributes, {
+                                                id: 'BRAND',
+                                                value_name: 'Amiibo'
+                                            }).length > 0;
+                                    })
+                                })
+                            })
+                        })
+                    })
+                }, $.Deferred().resolve()).then(() => {
+                    _.map(this.products, (group, term) => group.results.map((product, index) => {
+                        seller(product.seller.id).then(data => {
+                            Vue.set(this.products[term].results[index].seller, 'details', data)
+                            // data.seller_reputation.level_id === '1_red' && delete this.products[term][index]
+                        })
+                    }))
+                })
+            }
+        })
+    </script>
+</body>
+
+</html>
+
