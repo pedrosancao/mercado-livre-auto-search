@@ -18,7 +18,7 @@
     p:last-child {
         margin-bottom: 0;
     }
-    .terms {
+    .terms, .zipcode {
         margin: auto;
         max-width: 500px;
     }
@@ -72,7 +72,7 @@
                 <p
                     v-if="_.filter(products, { term }).length === 0"
                     class="bg-light border rounded text-center p-1"
-                    @click="load(index)"
+                    @click="loadProducts(index)"
                 >
                     {{ term | ucWords }}
                     <button type="button" class="close" aria-label="Close" @click="removeTerm($event, index)">
@@ -82,6 +82,12 @@
             </template>
             <input type="text" class="w-100 bg-light border rounded text-center py-1" v-model="newTerm" @keypress="addTerm">
         </div>
+        <hr>
+        <div class="zipcode d-flex">
+            <span class="mt-1 mr-2">zipcode:</span>
+            <input type="text" class="flex-grow-1 bg-light border rounded text-center py-1" v-model="zipcode" @keyup="storeZipcode">
+        </div> 
+        <hr>
         <template v-for="group in products">
             <h3 class="mt-3 px-5">{{ group.term | ucWords }}</h3>
             <div v-if="group.results" class="products mt-2">
@@ -94,7 +100,26 @@
                     <div v-if="product" class="p-2 bg-light border text-center d-flex flex-column justify-content-between">
                         <p><a :href="product.permalink" target="_blank">{{ product.title }}</a></p>
                         <a :href="product.permalink" target="_blank"><img :src="product.thumbnail" class="m-auto"></a>
-                        <p>{{ product.price.toLocaleString('defaut', { style: 'currency', currency: 'BRL' }) }}</p>
+                        <p class="mb-0">
+                            {{ product.price | currency }}
+                            <small v-if="product.shipping.details">
+                                {{ product.price + _.filter(product.shipping.details.options, { display: 'recommended' })[0].cost | currency }}
+                            </small>
+                        </p>
+                        <p>
+                            <small v-if="product.shipping.mode === 'not_specified'">
+                                a combinar ({{ product.seller_address.state.id }} - {{ product.seller_address.city.name }})
+                            </small>
+                            <small v-if="product.shipping.mode === 'me2' && zipcode.length === 8">
+                                +
+                                <template v-if="product.shipping.details">
+                                    {{ _.filter(product.shipping.details.options, { display: 'recommended' })[0].cost | currency }}
+                                    -
+                                    {{ _.filter(product.shipping.details.options, { display: 'recommended' })[0].name }}
+                                </template>
+                                <template v-else>calculando</template>
+                            </small>
+                        </span>
                         <p v-if="product.seller.details">
                             <a :href="product.seller.details.permalink" :title="product.seller.details.nickname" target="_blank">
                                 <i class="fas fa-square" :style="`color: ${getReputationColor(product.seller.details.seller_reputation.level_id)};`"></i>
@@ -112,24 +137,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.15/lodash.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.6.11/vue.js"></script>
     <script>
-        function search(search) {
-            let url = 'https://api.mercadolibre.com/sites/MLB/search?'
-            let query = $.param({
-                category: 'MLB186456'
-            ,   q: search
-            ,   price: '160.0-260.0'
-            ,   sort: 'price_asc'
-            // ,   shipping_quarantine: 'guaranteed_delivery'
-            ,   ITEM_CONDITION: 2230581
-            ,   VIDEO_GAME_PLATFORM:424952
-            })
-            return fetch(url + query);
-        }
-        async function seller (id) {
-            let resp = await fetch('https://api.mercadolibre.com/users/' + id)
-            return await resp.json()
-        }
-        let raw = {}
         let localStorageKey = 'mlSearchTerms'
         let app = new Vue({
             el: '#app',
@@ -137,10 +144,14 @@
                 newTerm: '',
                 watchlistError: false,
                 terms: JSON.parse(localStorage.getItem(localStorageKey)) || [],
+                zipcode: localStorage.getItem(localStorageKey + 'Zipcode') || '',
                 messages: [],
                 products: []
             }),
             filters: {
+                currency: function (value) {
+                    return value ? value.toLocaleString('defaut', { style: 'currency', currency: 'BRL' }) : ''
+                },
                 ucWords: function (value) {
                     return value ? value.replace(/\b\w/g, match => match.toUpperCase()) : ''
                 }
@@ -181,36 +192,71 @@
                 storeTerms: function () {
                     localStorage.setItem(localStorageKey, JSON.stringify(this.terms))
                 },
-                load: function (index) {
+                storeZipcode: _.debounce(function () {
+                    localStorage.setItem(localStorageKey + 'Zipcode', this.zipcode)
+                }, 400),
+                search: function (search) {
+                    let url = 'https://api.mercadolibre.com/sites/MLB/search?'
+                    let query = $.param({
+                        category: 'MLB186456'
+                    ,   q: search
+                    ,   price: '160.0-260.0'
+                    ,   sort: 'price_asc'
+                    // ,   shipping_quarantine: 'guaranteed_delivery'
+                    ,   ITEM_CONDITION: 2230581
+                    ,   VIDEO_GAME_PLATFORM:424952
+                    })
+                    return fetch(url + query).then(resp => resp.json())
+                },
+                seller: function (id) {
+                    return fetch('https://api.mercadolibre.com/users/' + id).then(resp => resp.json())
+                },
+                shipping: function (id, zipcode) {
+                    return fetch(`https://api.mercadolibre.com/items/${id}/shipping_options?zip_code=${zipcode}` ).then(resp => resp.json())
+                },
+                loadProducts: function (index) {
                     let term = this.terms[index]
                     let productIndex = this.products.length
                     Vue.set(this.products, productIndex, { term });
-                    search(term).then(resp => {
-                        return resp.json().then(data => {
-                            data.paging.total > 50 && this.messages.push(term + ' tem mais de 50 resultados')
-                            raw[term] = data
-                            Vue.set(this.products[productIndex], 'results', _.reject(data.results, product => {
-                                let title = product.title.toLocaleLowerCase()
-                                return title.indexOf('3ds') > -1 ||
-                                    title.indexOf('wii') > -1 ||
-                                    title.indexOf('fones') > -1 ||
-                                    title.indexOf('digitais') > -1 ||
-                                    title.indexOf('digital') > -1 ||
-                                    title.indexOf('amiibo') > -1 ||
-                                    _.filter(product.attributes, {
-                                        id: 'BRAND',
-                                        value_name: 'Amiibo'
-                                    }).length > 0;
-                            }))
-                        })
+                    this.search(term).then(data => {
+                        data.paging.total > 50 && this.messages.push(term + ' tem mais de 50 resultados')
+                        Vue.set(this.products[productIndex], 'results', _.reject(data.results, product => {
+                            let title = product.title.toLocaleLowerCase()
+                            return title.indexOf('3ds') > -1 ||
+                                title.indexOf('wii') > -1 ||
+                                title.indexOf('fones') > -1 ||
+                                title.indexOf('digitais') > -1 ||
+                                title.indexOf('digital') > -1 ||
+                                title.indexOf('amiibo') > -1 ||
+                                _.filter(product.attributes, {
+                                    id: 'BRAND',
+                                    value_name: 'Amiibo'
+                                }).length > 0;
+                        }))
                     }).then(() => {
-                        this.products[this.products.length - 1].results.map((product, index) => {
-                            seller(product.seller.id).then(data => {
-                                Vue.set(this.products[this.products.length - 1].results[index].seller, 'details', data)
+                        this.loadSellers(productIndex)
+                    }).then(() => {
+                        this.loadShippings(productIndex)
+                    })
+                },
+                loadSellers: function (productIndex) {
+                    this.products[productIndex].results.reduce((promise, product, index) => {
+                        return promise.then(() => {
+                            return this.seller(product.seller.id).then(data => {
+                                Vue.set(this.products[productIndex].results[index].seller, 'details', data)
                                 // data.seller_reputation.level_id === '1_red' && delete this.products[term][index]
                             })
                         })
-                    })
+                    }, $.Deferred().resolve())
+                },
+                loadShippings: function (productIndex) {
+                    this.zipcode.length === 8 && this.products[productIndex].results.reduce((promise, product, index) => {
+                        return promise.then(() => {
+                            return this.shipping(product.id, this.zipcode).then(data => {
+                                Vue.set(this.products[productIndex].results[index].shipping, 'details', data)
+                            })
+                        })
+                    }, $.Deferred().resolve())
                 }
             }
         })
