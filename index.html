@@ -16,6 +16,13 @@
     p:last-child {
         margin-bottom: 0;
     }
+    .terms {
+        margin: auto;
+        max-width: 500px;
+    }
+    .terms > * {
+        cursor: pointer;
+    }
     .products {
         display: grid;
         grid-template-columns: repeat(1, 1fr);
@@ -45,12 +52,27 @@
 </head>
 <body>
     <div id="app">
+        <div class="terms mt-2">
+            <template v-for="term, index in terms">
+                <p
+                    v-if="_.filter(products, { term }).length === 0"
+                    class="bg-light border text-center p-1 rounded"
+                    @click="load(index)"
+                >
+                    {{ term | ucWords }}
+                    <button type="button" class="close" aria-label="Close" @click="remove($event, index)">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </p>
+            </template>
+            <input type="text" class="w-100" v-model="newTerm" @keypress="add">
+        </div>
         <div class="messages mt-2" v-if="messages.length > 0">
             <div class="alert alert-warning" v-for="message in messages">{{ message }}</div>
         </div>
         <template v-for="group in products">
             <h3 class="mt-3 px-5">{{ group.term | ucWords }}</h3>
-            <div class="products mt-2">
+            <div v-if="group.results" class="products mt-2">
                 <template v-if="group.results.length === 0">
                     <div class="p-2 bg-light border text-center d-flex flex-column justify-content-between">
                         <p>Nenhum resultado</p>
@@ -96,70 +118,71 @@
             return await resp.json()
         }
         let raw = {}
-        let games = [
-            'mario odyssey'
-        ,   'super smash bros ultimate'
-        ,   'super mario party switch'
-        ,   'zelda breath of the wild'
-        ,   'donkey kong tropical freeze'
-        ,   'pokemon sword'
-        ,   'pokemon shield'
-        ,   'mario kart 8 deluxe'
-        // ,   'xenoblade 2'
-        ,   'splatoon 2'
-        // ,   'steamworld dig 2'
-        ]
+        let localStorageKey = 'mlSearchTerms'
         let app = new Vue({
             el: '#app',
-            data: {
+            data: () => ({
+                newTerm: '',
+                terms: JSON.parse(localStorage.getItem(localStorageKey)) || [],
                 messages: [],
                 products: []
-            },
+            }),
             filters: {
                 ucWords: function (value) {
-                    return value.replace(/\b\w/g, match => match.toUpperCase())
+                    return value ? value.replace(/\b\w/g, match => match.toUpperCase()) : ''
                 }
             },
             methods: {
                 getReputationColor: function (value) {
                     let key = (value || '0').split('_')[0]
                     return _.get(['lightgray', 'red', 'orange', 'gold', 'lightgreen', 'green'], key)
-                }
-            },
-            created: function () {
-                games.reduce((promise, game) => {
-                    return promise.then(() => {
-                        return search(game).then(resp => {
-                            return resp.json().then(data => {
-                                data.paging.total > 50 && this.messages.push(game + ' tem mais de 50 resultados')
-                                raw[game] = data
-                                this.products.push({
-                                    term: game,
-                                    results: _.reject(data.results, product => {
-                                        let title = product.title.toLocaleLowerCase()
-                                        return title.indexOf('3ds') > -1 ||
-                                            title.indexOf('wii') > -1 ||
-                                            title.indexOf('fones') > -1 ||
-                                            title.indexOf('digitais') > -1 ||
-                                            title.indexOf('digital') > -1 ||
-                                            title.indexOf('amiibo') > -1 ||
-                                            _.filter(product.attributes, {
-                                                id: 'BRAND',
-                                                value_name: 'Amiibo'
-                                            }).length > 0;
-                                    })
-                                })
+                },
+                add: function (event) {
+                    if (event.keyCode === event.DOM_VK_RETURN) {
+                        this.terms.push(this.newTerm)
+                        this.newTerm = ''
+                        this.storeTerms()
+                    }
+                },
+                remove: function (event, index) {
+                    event.stopPropagation()
+                    this.terms = _.reject(this.terms, (term, key) => key === index)
+                    this.storeTerms()
+                },
+                storeTerms: function () {
+                    localStorage.setItem(localStorageKey, JSON.stringify(this.terms))
+                },
+                load: function (index) {
+                    let term = this.terms[index]
+                    let productIndex = this.products.length
+                    Vue.set(this.products, productIndex, { term });
+                    search(term).then(resp => {
+                        return resp.json().then(data => {
+                            data.paging.total > 50 && this.messages.push(term + ' tem mais de 50 resultados')
+                            raw[term] = data
+                            Vue.set(this.products[productIndex], 'results', _.reject(data.results, product => {
+                                let title = product.title.toLocaleLowerCase()
+                                return title.indexOf('3ds') > -1 ||
+                                    title.indexOf('wii') > -1 ||
+                                    title.indexOf('fones') > -1 ||
+                                    title.indexOf('digitais') > -1 ||
+                                    title.indexOf('digital') > -1 ||
+                                    title.indexOf('amiibo') > -1 ||
+                                    _.filter(product.attributes, {
+                                        id: 'BRAND',
+                                        value_name: 'Amiibo'
+                                    }).length > 0;
+                            }))
+                        })
+                    }).then(() => {
+                        this.products[this.products.length - 1].results.map((product, index) => {
+                            seller(product.seller.id).then(data => {
+                                Vue.set(this.products[this.products.length - 1].results[index].seller, 'details', data)
+                                // data.seller_reputation.level_id === '1_red' && delete this.products[term][index]
                             })
                         })
                     })
-                }, $.Deferred().resolve()).then(() => {
-                    _.map(this.products, (group, term) => group.results.map((product, index) => {
-                        seller(product.seller.id).then(data => {
-                            Vue.set(this.products[term].results[index].seller, 'details', data)
-                            // data.seller_reputation.level_id === '1_red' && delete this.products[term][index]
-                        })
-                    }))
-                })
+                }
             }
         })
     </script>
