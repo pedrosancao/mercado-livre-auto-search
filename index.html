@@ -52,7 +52,20 @@
 </head>
 <body>
     <div id="app">
+        <div class="messages mt-2" v-if="messages.length > 0">
+            <div class="alert alert-warning" v-for="message, index in messages">
+                {{ message }}
+                <button type="button" class="close" aria-label="Close" @click="dismissMessage(index)">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        </div>
         <div class="terms mt-2">
+            <p
+                v-if="!watchlistError && terms.length === 0"
+                class="bg-light border text-center p-1 rounded"
+                @click="watchlist"
+            >Load watch list</p>
             <template v-for="term, index in terms">
                 <p
                     v-if="_.filter(products, { term }).length === 0"
@@ -60,15 +73,12 @@
                     @click="load(index)"
                 >
                     {{ term | ucWords }}
-                    <button type="button" class="close" aria-label="Close" @click="remove($event, index)">
+                    <button type="button" class="close" aria-label="Close" @click="removeTerm($event, index)">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </p>
             </template>
-            <input type="text" class="w-100" v-model="newTerm" @keypress="add">
-        </div>
-        <div class="messages mt-2" v-if="messages.length > 0">
-            <div class="alert alert-warning" v-for="message in messages">{{ message }}</div>
+            <input type="text" class="w-100" v-model="newTerm" @keypress="addTerm">
         </div>
         <template v-for="group in products">
             <h3 class="mt-3 px-5">{{ group.term | ucWords }}</h3>
@@ -123,6 +133,7 @@
             el: '#app',
             data: () => ({
                 newTerm: '',
+                watchlistError: false,
                 terms: JSON.parse(localStorage.getItem(localStorageKey)) || [],
                 messages: [],
                 products: []
@@ -137,17 +148,33 @@
                     let key = (value || '0').split('_')[0]
                     return _.get(['lightgray', 'red', 'orange', 'gold', 'lightgreen', 'green'], key)
                 },
-                add: function (event) {
+                addTerm: function (event) {
                     if (event.keyCode === event.DOM_VK_RETURN) {
-                        this.terms.push(this.newTerm)
+                        this.terms.push(this.newTerm.toLowerCase())
                         this.newTerm = ''
                         this.storeTerms()
                     }
                 },
-                remove: function (event, index) {
+                removeTerm: function (event, index) {
                     event.stopPropagation()
                     this.terms = _.reject(this.terms, (term, key) => key === index)
                     this.storeTerms()
+                },
+                dismissMessage: function (index) {
+                    this.messages = _.reject(this.messages, (term, key) => key === index)
+                },
+                watchlist: function () {
+                    fetch('./watch-list.json').then(resp => {
+                        if (resp.status === 200) {
+                            resp.json().then(data => {
+                                this.terms = data
+                                this.storeTerms
+                            })
+                        } else {
+                            this.watchlistError = true
+                            this.messages.push('Unable to load watch list')
+                        }
+                    })
                 },
                 storeTerms: function () {
                     localStorage.setItem(localStorageKey, JSON.stringify(this.terms))
