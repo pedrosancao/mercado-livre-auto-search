@@ -101,23 +101,27 @@
                         <p><a :href="product.permalink" target="_blank">{{ product.title }}</a></p>
                         <a :href="product.permalink" target="_blank"><img :src="product.thumbnail" class="m-auto"></a>
                         <p class="mb-0">
-                            {{ product.price | currency }}
-                            <small v-if="product.shipping.details">
+                            <template v-if="product.shipping.details">
                                 {{ product.price + _.filter(product.shipping.details.options, { display: 'recommended' })[0].cost | currency }}
-                            </small>
+                                <small v-if="product.shipping.details">
+                                    {{ product.price | currency }}
+                                </small>
+                            </template>
+                            <template v-else>{{ product.price | currency }}</template>
                         </p>
                         <p>
                             <small v-if="product.shipping.mode === 'not_specified'">
                                 a combinar ({{ product.seller_address.state.id }} - {{ product.seller_address.city.name }})
                             </small>
                             <small v-if="product.shipping.mode === 'me2' && zipcode.length === 8">
-                                +
                                 <template v-if="product.shipping.details">
-                                    {{ _.filter(product.shipping.details.options, { display: 'recommended' })[0].cost | currency }}
-                                    -
-                                    {{ _.filter(product.shipping.details.options, { display: 'recommended' })[0].name }}
+                                    <template v-if="_.filter(product.shipping.details.options, { display: 'recommended' })[0].cost > 0">
+                                        + {{ _.filter(product.shipping.details.options, { display: 'recommended' })[0].cost | currency }} envio
+                                    </template>
+                                    <template v-else>envio grátis</template>
+                                    ({{ _.filter(product.shipping.details.options, { display: 'recommended' })[0].name }})
                                 </template>
-                                <template v-else>calculando</template>
+                                <template v-else>calculando envio</template>
                             </small>
                         </span>
                         <p v-if="product.seller.details">
@@ -251,11 +255,11 @@
                 },
                 loadShippings: function (productIndex) {
                     this.zipcode.length === 8 && this.products[productIndex].results.reduce((promise, product, index) => {
-                        return promise.then(() => {
+                        return product.shipping.mode === 'me2' ? promise.then(() => {
                             return this.shipping(product.id, this.zipcode).then(data => {
                                 Vue.set(this.products[productIndex].results[index].shipping, 'details', data)
                             })
-                        })
+                        }) : promise;
                     }, $.Deferred().resolve())
                 }
             }
