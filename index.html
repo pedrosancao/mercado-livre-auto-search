@@ -99,7 +99,7 @@
                 <template v-for="product in _.sortBy(group.results, 'price')">
                     <div v-if="product" class="p-2 bg-light border text-center d-flex flex-column justify-content-between">
                         <p><a :href="product.permalink" target="_blank">{{ product.title }}</a></p>
-                        <a :href="product.permalink" target="_blank"><img :src="product.thumbnail" class="m-auto"></a>
+                        <a :href="product.permalink" target="_blank"><img :src="product.thumbnail.replace('http://', 'https://')" class="m-auto"></a>
                         <p class="mb-0">
                             <template v-if="product.shipping.details">
                                 {{ product.price + _.filter(product.shipping.details.options, { display: 'recommended' })[0].cost | currency }}
