@@ -131,11 +131,11 @@
                         </div>
                     </div>
                 </div>
-                <div class="max-sized attributes d-flex mt-3" v-if="categoryAttrs.length > 0">
+                <div class="max-sized attributes d-flex justify-content-between mt-3" v-if="categoryAttrs.length > 0">
                     <span class="mr-2 mt-1">Price:</span>
-                    <input type="text" class="flex-grow-1 bg-light border rounded text-center py-1" v-model="priceMin" placeholder="minimum">
-                    &nbsp;-&nbsp;
-                    <input type="text" class="flex-grow-1 bg-light border rounded text-center py-1" v-model="priceMax" placeholder="maximum">
+                    <input type="text" class="w-25 bg-light border rounded text-center py-1" v-model="priceMin" placeholder="minimum">
+                    <span>-</span>
+                    <input type="text" class="w-25 bg-light border rounded text-center py-1" v-model="priceMax" placeholder="maximum">
                 </div>
                 <div class="max-sized zipcode d-flex align-items-center mt-3">
                     <span class="mr-2">Zipcode:</span>
