@@ -3,8 +3,6 @@
 Automatic search on ["Mercado Livre" API][meli-api]. With custom filters and default watch list
 and shipping calculation. Storage keeps data for current browser only using `localstorage`.
 
-Current filter to used Nintendo Switch games.
-
 Created with Bootstrap and Vue.js from CDN.
 
 To add a default watch list copy `watch-list.example.json` to `watch-list.json` file and set your search terms.
