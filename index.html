@@ -131,6 +131,12 @@
                         </div>
                     </div>
                 </div>
+                <div class="max-sized attributes d-flex mt-3" v-if="categoryAttrs.length > 0">
+                    <span class="mr-2 mt-1">Price:</span>
+                    <input type="text" class="flex-grow-1 bg-light border rounded text-center py-1" v-model="priceMin" placeholder="minimum">
+                    &nbsp;-&nbsp;
+                    <input type="text" class="flex-grow-1 bg-light border rounded text-center py-1" v-model="priceMax" placeholder="maximum">
+                </div>
                 <div class="max-sized zipcode d-flex align-items-center mt-3">
                     <span class="mr-2">Zipcode:</span>
                     <input type="text" class="flex-grow-1 bg-light border rounded text-center py-1" v-model="zipcode" @keyup="storeZipcode">
@@ -203,6 +209,8 @@
                 categoryList: [],
                 categoryAttrs: JSON.parse(localStorage.getItem(localStorageKey + 'CategoryAttrs')) || [],
                 showCategoryAttrs: false,
+                priceMin: localStorage.getItem(localStorageKey + 'PriceMin'),
+                priceMax: localStorage.getItem(localStorageKey + 'PriceMax'),
                 zipcode: localStorage.getItem(localStorageKey + 'Zipcode') || '',
                 messages: [],
                 products: []
@@ -293,9 +301,11 @@
                     let query = {
                         category: this.categoryId
                     ,   q: search
-                    ,   price: '160.0-260.0'
                     ,   sort: 'price_asc'
                     // ,   shipping_quarantine: 'guaranteed_delivery'
+                    }
+                    if (this.priceMin || this.priceMax) {
+                        query.price = `${this.priceMin}-${this.priceMax}`
                     }
                     _.filter(this.categoryAttrs, 'selected').forEach(attribute => query[attribute.id] = attribute.selected)
                     return fetch(url + $.param(query)).then(resp => resp.json())
@@ -362,6 +372,16 @@
                     this.categoryName
                         ? localStorage.setItem(localStorageKey + 'CategoryName', this.categoryName)
                         : localStorage.removeItem(localStorageKey + 'CategoryName')
+                },
+                priceMin() {
+                    this.priceMin
+                        ? localStorage.setItem(localStorageKey + 'PriceMin', this.priceMin)
+                        : localStorage.removeItem(localStorageKey + 'PriceMin')
+                },
+                priceMax() {
+                    this.priceMax
+                        ? localStorage.setItem(localStorageKey + 'PriceMax', this.priceMax)
+                        : localStorage.removeItem(localStorageKey + 'PriceMax')
                 },
                 categoryAttrs: {
                     deep: true,
