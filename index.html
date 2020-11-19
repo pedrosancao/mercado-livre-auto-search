@@ -125,7 +125,7 @@
                         <div v-if="showCategoryAttrs" v-for="attribute in categoryAttrs" :key="attribute.id" class="d-flex mt-1 mw-100">
                             <span :title="attribute.name" class="text-truncate w-25">{{ attribute.name }}:</span>
                             <select class="flex-grow-1 ml-2 w-75" v-model="attribute.selected">
-                                <option value="null"></option>
+                                <option value=""></option>
                                 <option v-for="option in attribute.values" :value="option.id">{{ option.name }}</option>
                             </select>
                         </div>
