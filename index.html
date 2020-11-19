@@ -115,6 +115,22 @@
                         </template>
                     </div>
                 </div>
+                <div class="max-sized attributes d-flex mt-3" v-if="categoryAttrs.length > 0">
+                    <span class="mr-2 mt-1">Attributes:</span>
+                    <div class="flex-grow-1">
+                        <p class="w-100 bg-light border rounded text-center mb-0 p-1 pointer" @click="showCategoryAttrs = !showCategoryAttrs">
+                            {{ showCategoryAttrs ? 'hide' : 'show' }} attributes
+                            <button type="button" class="close" aria-label="Toggle visibility">↕️</button>
+                        </p>
+                        <div v-if="showCategoryAttrs" v-for="attribute in categoryAttrs" :key="attribute.id" class="d-flex mt-1 mw-100">
+                            <span :title="attribute.name" class="text-truncate w-25">{{ attribute.name }}:</span>
+                            <select class="flex-grow-1 ml-2 w-75" v-model="attribute.selected">
+                                <option value="null"></option>
+                                <option v-for="option in attribute.values" :value="option.id">{{ option.name }}</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
                 <div class="max-sized zipcode d-flex align-items-center mt-3">
                     <span class="mr-2">Zipcode:</span>
                     <input type="text" class="flex-grow-1 bg-light border rounded text-center py-1" v-model="zipcode" @keyup="storeZipcode">
@@ -185,6 +201,8 @@
                 categoryName: localStorage.getItem(localStorageKey + 'CategoryName') || 'Video Games',
                 categoryId: localStorage.getItem(localStorageKey + 'CategoryId') || 'MLB186456',
                 categoryList: [],
+                categoryAttrs: JSON.parse(localStorage.getItem(localStorageKey + 'CategoryAttrs')) || [],
+                showCategoryAttrs: false,
                 zipcode: localStorage.getItem(localStorageKey + 'Zipcode') || '',
                 messages: [],
                 products: []
@@ -199,6 +217,7 @@
             },
             created() {
                 this.loadCategories()
+                this.loadCategoriesAttributes()
             },
             mounted() {
                 this.$el.classList.remove('d-none')
@@ -246,6 +265,23 @@
                             resp.json().then(data => this.categoryList = data)
                         })
                 },
+                loadCategoriesAttributes() {
+                    if (!this.categoryId) {
+                        return
+                    }
+                    const previous = this.categoryAttrs
+                    this.categoryAttrs = []
+                    fetch(`https://api.mercadolibre.com/categories/${this.categoryId}/attributes`).then(resp => {
+                        resp.json().then(data => {
+                            this.categoryAttrs = _.filter(data, 'values').map(attribute => {
+                                const index = previous.findIndex(attr => attr.id === attribute.id)
+                                return Object.assign(_.pick(attribute, ['id', 'name', 'values']), {
+                                    selected: ~index ? previous[index].selected : null
+                                })
+                            })
+                        })
+                    })
+                },
                 storeTerms() {
                     localStorage.setItem(localStorageKey, JSON.stringify(this.terms))
                 },
@@ -254,16 +290,15 @@
                 }, 400),
                 search(search) {
                     let url = 'https://api.mercadolibre.com/sites/MLB/search?'
-                    let query = $.param({
+                    let query = {
                         category: this.categoryId
                     ,   q: search
                     ,   price: '160.0-260.0'
                     ,   sort: 'price_asc'
                     // ,   shipping_quarantine: 'guaranteed_delivery'
-                    ,   ITEM_CONDITION: 2230581
-                    ,   VIDEO_GAME_PLATFORM: 424952
-                    })
-                    return fetch(url + query).then(resp => resp.json())
+                    }
+                    _.filter(this.categoryAttrs, 'selected').forEach(attribute => query[attribute.id] = attribute.selected)
+                    return fetch(url + $.param(query)).then(resp => resp.json())
                 },
                 seller(id) {
                     return fetch('https://api.mercadolibre.com/users/' + id).then(resp => resp.json())
@@ -327,6 +362,12 @@
                     this.categoryName
                         ? localStorage.setItem(localStorageKey + 'CategoryName', this.categoryName)
                         : localStorage.removeItem(localStorageKey + 'CategoryName')
+                },
+                categoryAttrs: {
+                    deep: true,
+                    handler(categoryAttrs, to) {
+                        localStorage.setItem(localStorageKey + 'CategoryAttrs', JSON.stringify(categoryAttrs))
+                    }
                 }
             }
         })
