@@ -1,10 +1,13 @@
 # mercado-livre-auto-search
 
-Automatic search for "Mercado Livre" API
+Automatic search on ["Mercado Livre" API][meli-api]. With custom filters and default watch list
+and shipping calculation. Storage keeps data for current browser only using `localstorage`.
 
-Loads and filters my Nintendo Switch games watch list on "Mercado Livre".
+Current filter to used Nintendo Switch games.
 
-To add a watch list create `watch-list.json` file on root with and array of you search terms.
+Created with Bootstrap and Vue.js from CDN.
+
+To add a default watch list copy `watch-list.example.json` to `watch-list.json` file and set your search terms.
 
 ## Black lives matter
 
@@ -12,3 +15,4 @@ To add a watch list create `watch-list.json` file on root with and array of you 
 [GitHub abandons 'master' term to avoid slavery row][master-replace].
 
 [master-replace]: https://www.bbc.com/news/technology-53050955
+[meli-api]: https://developers.mercadolivre.com.br/pt_br/guia-para-produtos
